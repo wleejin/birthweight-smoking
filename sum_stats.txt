@@ -1,0 +1,14 @@
+                                           mean      std
+Birthweight (g)                        3456.810  539.555
+LBW indicator                             0.039    0.193
+Gestation (wks)                          39.249    2.164
+Smoking indicator                         0.130    0.336
+Age                                      28.481    5.447
+Education (yrs)                          13.880    2.275
+Black indicator                           0.074    0.262
+Kessner index = 2                         0.169    0.375
+Kessner index = 3                         0.040    0.195
+No prenatal visit                         0.007    0.086
+First prenatal visit in 2nd trimester     0.113    0.317
+First prenatal visit in 3rd trimester     0.020    0.140
+# cigarettes/day (for smokers)           12.552    7.834
