@@ -8,7 +8,6 @@ Jason Abrevaya. 2006. "Estimating the effect of smoking on birth outcomes using
 a matched panel data approach." Journal of Applied Econometrics.
 -------------------------------------------------------------------------------
 '''
-
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -74,6 +73,15 @@ print('Share of smoking moms = ',
 #------------------------------------------------------------------------------
 # 2. Table 3, 4, and 6: Pooled OLS
 #------------------------------------------------------------------------------
+# A function for OLS regression tables
+def reg_ols_table(reg_res, dep_name):
+    table_temp = pd.DataFrame({'b': round(reg_res.params['smoke'], 2),
+                        'se': round(reg_res.bse['smoke'], 2),
+                        't': round(reg_res.tvalues['smoke'], 2),
+                        'pval': round(reg_res.pvalues['smoke'], 2)}, 
+                        index=[f"smoke on {dep_name}"])
+    return table_temp
+
 # Regressand = dbirwt
 ols_dbirwt = smf.ols(
             formula='dbirwt ~ C(year) + C(stateres) + C(nlbnl)' 
@@ -82,49 +90,33 @@ ols_dbirwt = smf.ols(
             '+ pretri2 + pretri3', 
             data=df)
 res_ols_dbirwt = ols_dbirwt.fit(cov_type='HC1')
-table_ols1 = pd.DataFrame({'b': round(res_ols_dbirwt.params['smoke'], 2),
-                        'se': round(res_ols_dbirwt.bse['smoke'], 2),
-                        't': round(res_ols_dbirwt.tvalues['smoke'], 2),
-                        'pval': round(res_ols_dbirwt.pvalues['smoke'], 2)}, 
-                        index=['smoke on dbirwt'])
+table_ols1 = reg_ols_table(res_ols_dbirwt, 'dbirwt')
 
 # Regressand = dbirwt (w/ SE clustered by momid3)
 res_ols_dbirwt_cluster = ols_dbirwt.fit(
     cov_type='cluster', cov_kwds={'groups': df['momid3']}
     )
-table_ols1_cluster = pd.DataFrame({'b': round(res_ols_dbirwt_cluster.params['smoke'], 2),
-                        'se': round(res_ols_dbirwt_cluster.bse['smoke'], 2),
-                        't': round(res_ols_dbirwt_cluster.tvalues['smoke'], 2),
-                        'pval': round(res_ols_dbirwt_cluster.pvalues['smoke'], 2)}, 
-                        index=['smoke on dbirwt (clustered)'])
+table_ols1_cluster = reg_ols_table(res_ols_dbirwt_cluster, 'dbirwt')
 
 # Regressand = dbirwt (w/ additional regressor, cigar)
-ols_dbirwt_cig = smf.ols(
+res_ols_dbirwt_cig = smf.ols(
             formula='dbirwt ~ C(year) + C(stateres) + C(nlbnl)'
             '+ smoke + male + dmage + agesq + hsgrad + somecoll + collgrad'
             '+ married + black + adeqcode2 + adeqcode3 + novisit' 
             '+ pretri2 + pretri3 + cigar', 
-            data=df,  subset=(df['cigar'] <99))
-res_ols_dbirwt_cig = ols_dbirwt_cig.fit(cov_type='HC1')
-table_ols2 = pd.DataFrame({'b': round(res_ols_dbirwt_cig.params['smoke'], 2),
-                        'se': round(res_ols_dbirwt_cig.bse['smoke'], 2),
-                        't': round(res_ols_dbirwt_cig.tvalues['smoke'], 2),
-                        'pval': round(res_ols_dbirwt_cig.pvalues['smoke'], 2)}, 
-                        index=['smoke (cig added) on dbirwt'])
+            data=df,  subset=(df['cigar'] <99)
+            ).fit(cov_type='HC1')
+table_ols2 = reg_ols_table(res_ols_dbirwt_cig, 'dbirwt')
 
 # Regressand = gestat
-ols_gestat = smf.ols(
+res_ols_gestat = smf.ols(
             formula='gestat ~ C(year) + C(stateres) + C(nlbnl)' 
             '+ smoke + male + dmage + agesq + hsgrad + somecoll + collgrad'
             '+ married + black + adeqcode2 + adeqcode3 + novisit' 
             '+ pretri2 + pretri3', 
-            data=df)
-res_ols_gestat = ols_gestat.fit(cov_type='HC1')
-table_ols3 = pd.DataFrame({'b': round(res_ols_gestat.params['smoke'], 2),
-                        'se': round(res_ols_gestat.bse['smoke'], 2),
-                        't': round(res_ols_gestat.tvalues['smoke'], 2),
-                        'pval': round(res_ols_gestat.pvalues['smoke'], 2)}, 
-                        index=['smoke on gestat'])
+            data=df
+            ).fit(cov_type='HC1')
+table_ols3 = reg_ols_table(res_ols_gestat, 'gestat')
 
 # Collect the coefficient of smoke for each regression into one table
 table_all = pd.concat([table_ols1,table_ols1_cluster,table_ols2,table_ols3])
@@ -168,49 +160,52 @@ print(table_compare_no_fe, file=open('OLS.txt','w'))
 #------------------------------------------------------------------------------
 # FE model
 #------------------------------------------------------------------------------
+'''
+The author did not, but it is better to cluster SE by mom's id. 
+    - Use .fit(cov_type='clustered', cluster_entity=True)
+However, clustering does not make much difference.
+'''
 df_panel = df.set_index(['momid3', 'idx'], drop=False)
 
+# A function for OLS regression tables
+def reg_fe_table(reg_res, dep_name):
+    table_temp = pd.DataFrame({'b': round(reg_res.params['smoke'], 2),
+                        'se': round(reg_res.std_errors['smoke'], 2),
+                        't': round(reg_res.tstats['smoke'], 2),
+                        'pval': round(reg_res.pvalues['smoke'], 2)}, 
+                        index=[f"smoke on {dep_name}"])
+    return table_temp
+
 # Regressand = dbirwt
-fe_dbirwt = plm.PanelOLS.from_formula(
+res_fe_dbirwt = plm.PanelOLS.from_formula(
             formula='dbirwt ~ EntityEffects +  C(year) + C(stateres) + C(nlbnl)' 
             '+ smoke + male + dmage + agesq + hsgrad + somecoll + collgrad'
             '+ married + black + adeqcode2 + adeqcode3 + novisit' 
             '+ pretri2 + pretri3',
-            data=df_panel, drop_absorbed=True)
-res_fe_dbirwt = fe_dbirwt.fit()
-table_fe1 = pd.DataFrame({'b': round(res_fe_dbirwt.params['smoke'], 2),
-                        'se': round(res_fe_dbirwt.std_errors['smoke'], 2),
-                        't': round(res_fe_dbirwt.tstats['smoke'], 2),
-                        'pval': round(res_fe_dbirwt.pvalues['smoke'], 2)}, 
-                        index=['smoke on dbirwt'])
+            data=df_panel, drop_absorbed=True
+            ).fit()
+table_fe1 = reg_fe_table(res_fe_dbirwt, 'dbirwt')
 
 # Regressand = dbirwt (w/ additional regressor, cigar)
-fe_dbirwt_cig = plm.PanelOLS.from_formula(
+res_fe_dbirwt_cig = plm.PanelOLS.from_formula(
             formula='dbirwt ~ EntityEffects +  C(year) + C(stateres) + C(nlbnl)' 
             '+ smoke + male + dmage + agesq + hsgrad + somecoll + collgrad'
             '+ married + black + adeqcode2 + adeqcode3 + novisit' 
             '+ pretri2 + pretri3 + cigar',
-            data=df_panel.loc[df_panel['cigar']<99, :], drop_absorbed=True)
-res_fe_dbirwt_cig = fe_dbirwt_cig.fit()
-table_fe2 = pd.DataFrame({'b': round(res_fe_dbirwt_cig.params['smoke'], 2),
-                        'se': round(res_fe_dbirwt_cig.std_errors['smoke'], 2),
-                        't': round(res_fe_dbirwt_cig.tstats['smoke'], 2),
-                        'pval': round(res_fe_dbirwt_cig.pvalues['smoke'], 2)}, 
-                        index=['smoke (cig added) on dbirwt'])
+            data=df_panel.loc[df_panel['cigar']<99, :], drop_absorbed=True
+            ).fit()
+table_fe2 = reg_fe_table(res_fe_dbirwt_cig, 'dbirwt')
 
 # Regressand = gestat
-fe_gestat = plm.PanelOLS.from_formula(
+res_fe_gestat = plm.PanelOLS.from_formula(
             formula='gestat ~ EntityEffects +  C(year) + C(stateres) + C(nlbnl)' 
             '+ smoke + male + dmage + agesq + hsgrad + somecoll + collgrad'
             '+ married + black + adeqcode2 + adeqcode3 + novisit' 
             '+ pretri2 + pretri3',
-            data=df_panel, drop_absorbed=True)
-res_fe_gestat = fe_gestat.fit()
-table_fe3 = pd.DataFrame({'b': round(res_fe_gestat.params['smoke'], 2),
-                        'se': round(res_fe_gestat.std_errors['smoke'], 2),
-                        't': round(res_fe_gestat.tstats['smoke'], 2),
-                        'pval': round(res_fe_gestat.pvalues['smoke'], 2)}, 
-                        index=['smoke on gestat'])
+            data=df_panel, drop_absorbed=True
+            ).fit()
+table_fe3 = reg_fe_table(res_fe_gestat, 'gestat')
+
 
 # Collect the coefficient of smoke for each regression into one table
 table_all = pd.concat([table_fe1,table_fe2,table_fe3])
@@ -230,32 +225,24 @@ print(table_compare.summary, file=open('FE.txt','w'))
 # RE model
 #------------------------------------------------------------------------------
 # Regressand = dbirwt
-re_dbirwt = plm.RandomEffects.from_formula(
+res_re_dbirwt = plm.RandomEffects.from_formula(
             formula='dbirwt ~ C(year) + C(stateres) + C(nlbnl)' 
             '+ smoke + male + dmage + agesq + hsgrad + somecoll + collgrad'
             '+ married + black + adeqcode2 + adeqcode3 + novisit' 
             '+ pretri2 + pretri3',
-            data=df_panel)
-res_re_dbirwt = re_dbirwt.fit()
-table_re1 = pd.DataFrame({'b': round(res_re_dbirwt.params['smoke'], 4),
-                        'se': round(res_re_dbirwt.std_errors['smoke'], 4),
-                        't': round(res_re_dbirwt.tstats['smoke'], 4),
-                        'pval': round(res_re_dbirwt.pvalues['smoke'], 4)}, 
-                        index=['smoke on dbirwt'])
+            data=df_panel
+            ).fit()
+table_re1 = reg_fe_table(res_re_dbirwt, 'dbirwt')
 
 # Regressand = gestat
-re_gestat = plm.RandomEffects.from_formula(
+res_re_gestat = plm.RandomEffects.from_formula(
             formula='gestat ~ C(year) + C(stateres) + C(nlbnl)' 
             '+ smoke + male + dmage + agesq + hsgrad + somecoll + collgrad'
             '+ married + black + adeqcode2 + adeqcode3 + novisit' 
             '+ pretri2 + pretri3',
-            data=df_panel)
-res_re_gestat = re_gestat.fit()
-table_re2 = pd.DataFrame({'b': round(res_re_gestat.params['smoke'], 4),
-                        'se': round(res_re_gestat.std_errors['smoke'], 4),
-                        't': round(res_re_gestat.tstats['smoke'], 4),
-                        'pval': round(res_re_gestat.pvalues['smoke'], 4)}, 
-                        index=['smoke on gestat'])
+            data=df_panel
+            ).fit()
+table_re2 = reg_fe_table(res_re_gestat, 'gestat')
 
 table_all = pd.concat([table_re1,table_re2])
 print(f'Coeff. of smoke: \n{table_all}\n')
@@ -295,13 +282,13 @@ print(f'pval: {pval}')
 # Estimation w/ proxy variable
 #------------------------------------------------------------------------------
 # Regressand = dbirwt
-reg = smf.ols(
+ols_dbirwt = smf.ols(
             formula='dbirwt ~ C(year) + C(stateres) + C(nlbnl)' 
             '+ smoke + male + dmage + agesq + hsgrad + somecoll + collgrad'
             '+ married + black + adeqcode2 + adeqcode3 + novisit' 
             '+ pretri2 + pretri3', 
-            data=df.loc[df['proxy_or_proxyhat'] == 1, :])
-ols_dbirwt = reg.fit(cov_type='HC1')
+            data=df.loc[df['proxy_or_proxyhat'] == 1, :]
+            ).fit(cov_type='HC1')
 table_ols = pd.DataFrame({'b': round(ols_dbirwt.params['smoke'], 4),
                         'se': round(ols_dbirwt.bse['smoke'], 4),
                         't': round(ols_dbirwt.tvalues['smoke'], 4),
